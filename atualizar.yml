@@ -1,0 +1,36 @@
+name: Atualizar Dados Rio Coruripe
+
+on:
+  schedule:
+    # Roda a cada 1 hora (minuto 0 de cada hora)
+    - cron: '0 * * * *'
+  
+  # Permite rodar manualmente pelo painel do GitHub
+  workflow_dispatch:
+
+jobs:
+  coletar:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write   # Permite salvar o dados.json no repositório
+
+    steps:
+      - name: 📥 Baixar repositório
+        uses: actions/checkout@v4
+
+      - name: 🐍 Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 🌊 Coletar dados do Rio Coruripe
+        run: python coletar.py
+
+      - name: 💾 Salvar dados.json no repositório
+        run: |
+          git config user.name  "Rio Coruripe Bot"
+          git config user.email "bot@rio-coruripe"
+          git add dados.json
+          git diff --staged --quiet || git commit -m "🌊 Dados atualizados: $(date '+%d/%m/%Y %H:%M')"
+          git push

@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="theme-color" content="#070e1c">
+<meta name="description" content="Monitoramento em tempo real do Rio Coruripe - Alagoas">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Rio Coruripe">
+<link rel="manifest" href="manifest.json">
+<title>Rio Coruripe — Monitor</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg: #070e1c;
+    --surface: #0d1929;
+    --surface2: #111f36;
+    --border: #1a2d47;
+    --text: #e8f0fe;
+    --muted: #5a7a9e;
+    --accent: #3b82f6;
+    --normal: #22c55e;    --normal-bg: #052e16;
+    --attention: #f59e0b; --attention-bg: #1c1407;
+    --alert: #f97316;     --alert-bg: #1c0f07;
+    --critical: #ef4444;  --critical-bg: #1c0707;
+    --unknown: #6b7280;   --unknown-bg: #111827;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Syne', sans-serif; min-height: 100dvh; overflow-x: hidden;
+  }
+  body::before {
+    content:''; position:fixed; inset:0;
+    background-image: linear-gradient(rgba(59,130,246,.03) 1px,transparent 1px),
+                      linear-gradient(90deg,rgba(59,130,246,.03) 1px,transparent 1px);
+    background-size:40px 40px; pointer-events:none; z-index:0;
+  }
+  .app { position:relative; z-index:1; max-width:430px; margin:0 auto; padding:0 0 90px; }
+
+  /* ── Header ── */
+  header { padding:20px 20px 0; display:flex; align-items:center; justify-content:space-between; }
+  .logo { display:flex; align-items:center; gap:10px; }
+  .logo-icon { width:36px; height:36px; background:linear-gradient(135deg,#1d4ed8,#3b82f6); border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px; }
+  .logo-label { font-size:13px; font-weight:600; color:var(--muted); letter-spacing:.1em; text-transform:uppercase; }
+  .logo-sub { font-size:10px; color:#2d4a6e; font-family:'Space Mono',monospace; }
+  .refresh-btn { background:var(--surface2); border:1px solid var(--border); color:var(--muted); width:36px; height:36px; border-radius:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:16px; transition:all .2s; }
+  .refresh-btn:active { transform:scale(.92); }
+  .refresh-btn.spinning { animation:spin 1s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* ── Status Card ── */
+  .status-card { margin:20px 16px 0; border-radius:20px; padding:24px; border:1px solid; transition:all .6s ease; position:relative; overflow:hidden; }
+  .status-card::before { content:''; position:absolute; top:-40px; right:-40px; width:150px; height:150px; border-radius:50%; opacity:.08; transition:background .6s; }
+  .status-card.normal   { background:var(--normal-bg);    border-color:var(--normal);    } .status-card.normal::before   { background:var(--normal); }
+  .status-card.attention{ background:var(--attention-bg); border-color:var(--attention); } .status-card.attention::before{ background:var(--attention); }
+  .status-card.alert    { background:var(--alert-bg);     border-color:var(--alert);     } .status-card.alert::before    { background:var(--alert); }
+  .status-card.critical { background:var(--critical-bg);  border-color:var(--critical);  animation:pulse-crit 2s ease-in-out infinite; } .status-card.critical::before { background:var(--critical); }
+  .status-card.unknown  { background:var(--unknown-bg);   border-color:var(--unknown);   }
+  @keyframes pulse-crit { 0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0)} 50%{box-shadow:0 0 0 8px rgba(239,68,68,.1)} }
+
+  .status-label { font-size:11px; font-weight:600; letter-spacing:.15em; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
+  .status-name  { font-size:26px; font-weight:800; line-height:1; margin-bottom:4px; }
+  .status-card.normal    .status-name { color:var(--normal); }
+  .status-card.attention .status-name { color:var(--attention); }
+  .status-card.alert     .status-name { color:var(--alert); }
+  .status-card.critical  .status-name { color:var(--critical); }
+  .status-card.unknown   .status-name { color:var(--unknown); }
+  .status-desc { font-size:13px; color:var(--muted); margin-top:6px; line-height:1.4; }
+
+  .level-row { display:flex; align-items:baseline; gap:6px; margin-top:20px; }
+  .level-value { font-family:'Space Mono',monospace; font-size:48px; font-weight:700; line-height:1; letter-spacing:-2px; }
+  .level-unit  { font-family:'Space Mono',monospace; font-size:16px; color:var(--muted); }
+  .level-trend { font-size:22px; margin-left:auto; }
+
+  .data-badge { display:inline-flex; align-items:center; gap:5px; background:rgba(59,130,246,.1); border:1px solid rgba(59,130,246,.2); border-radius:20px; padding:3px 10px; font-size:10px; color:var(--accent); font-family:'Space Mono',monospace; margin-top:8px; }
+  .data-badge.demo { background:rgba(245,158,11,.1); border-color:rgba(245,158,11,.2); color:var(--attention); }
+
+  /* Barra progresso */
+  .progress-section { margin-top:20px; }
+  .progress-labels { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); font-family:'Space Mono',monospace; margin-bottom:6px; }
+  .progress-bar  { height:8px; background:rgba(255,255,255,.05); border-radius:100px; overflow:visible; position:relative; }
+  .progress-fill { height:100%; border-radius:100px; transition:width 1s ease,background .6s; }
+  .progress-marker { position:absolute; top:-4px; width:2px; height:16px; border-radius:2px; transform:translateX(-50%); }
+  .marker-aten  { background:var(--attention); }
+  .marker-alert { background:var(--critical); }
+
+  .cotas-info { margin-top:12px; display:flex; gap:12px; }
+  .cota-item  { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--muted); font-family:'Space Mono',monospace; }
+  .cota-dot   { width:8px; height:8px; border-radius:50%; }
+
+  /* ── Seções ── */
+  .section-title { font-size:11px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); padding:0 20px; margin:24px 0 12px; }
+
+  .metrics-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:0 16px; }
+  .metric-card  { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:16px; }
+  .metric-label { font-size:10px; color:var(--muted); letter-spacing:.1em; text-transform:uppercase; margin-bottom:8px; }
+  .metric-value { font-family:'Space Mono',monospace; font-size:22px; font-weight:700; color:var(--text); }
+  .metric-sub   { font-size:10px; color:var(--muted); margin-top:4px; }
+
+  /* ── Gráfico ── */
+  .chart-container { margin:0 16px; background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:16px; }
+  .chart-header    { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+  .chart-title     { font-size:13px; font-weight:600; }
+  .chart-tabs      { display:flex; gap:4px; background:var(--bg); border-radius:8px; padding:3px; }
+  .chart-tab       { font-family:'Space Mono',monospace; font-size:10px; padding:4px 10px; border-radius:6px; cursor:pointer; color:var(--muted); border:none; background:transparent; transition:all .2s; }
+  .chart-tab.active{ background:var(--accent); color:white; }
+
+  /* ── Alertas ── */
+  .alerts-list { padding:0 16px; display:flex; flex-direction:column; gap:8px; }
+  .alert-item  { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:12px 14px; display:flex; align-items:center; gap:12px; }
+  .alert-dot   { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .alert-dot.normal    { background:var(--normal); }
+  .alert-dot.attention { background:var(--attention); }
+  .alert-dot.alert     { background:var(--alert); }
+  .alert-dot.critical  { background:var(--critical); }
+  .alert-dot.unknown   { background:var(--unknown); }
+  .alert-text  { flex:1; font-size:12px; line-height:1.4; }
+  .alert-time  { font-family:'Space Mono',monospace; font-size:10px; color:var(--muted); flex-shrink:0; }
+
+  /* ── Fonte info ── */
+  .source-info { margin:20px 16px 0; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:12px 14px; display:flex; align-items:center; gap:10px; }
+  .source-dot  { width:6px; height:6px; border-radius:50%; background:var(--normal); animation:blink 2s ease-in-out infinite; flex-shrink:0; }
+  .source-dot.off { background:var(--unknown); animation:none; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .source-text        { font-size:11px; color:var(--muted); line-height:1.4; }
+  .source-text strong { color:var(--text); }
+
+  /* ── Install banner ── */
+  .install-banner { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:430px; background:var(--surface2); border-top:1px solid var(--border); padding:12px 20px; display:flex; align-items:center; gap:12px; z-index:100; }
+  .install-text        { flex:1; font-size:12px; color:var(--muted); }
+  .install-text strong { color:var(--text); display:block; font-size:13px; }
+  .install-btn   { background:var(--accent); color:white; border:none; padding:8px 16px; border-radius:8px; font-family:'Syne',sans-serif; font-size:12px; font-weight:600; cursor:pointer; }
+  .install-close { background:none; border:none; color:var(--muted); font-size:18px; cursor:pointer; padding:0 4px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🌊</div>
+      <div>
+        <div class="logo-label">Rio Coruripe</div>
+        <div class="logo-sub">Coruripe · AL</div>
+      </div>
+    </div>
+    <button class="refresh-btn" id="refreshBtn" onclick="loadData()" title="Atualizar">↻</button>
+  </header>
+
+  <!-- Card principal -->
+  <div class="status-card unknown" id="statusCard">
+    <div class="status-label">Estação 27290000 · ANA / SEMARH-AL</div>
+    <div class="status-name" id="statusName">⟳ Carregando...</div>
+    <div class="status-desc" id="statusDesc">Buscando dados atualizados</div>
+
+    <div class="level-row">
+      <div class="level-value" id="levelValue">--.-</div>
+      <div class="level-unit">m</div>
+      <div class="level-trend" id="levelTrend">→</div>
+    </div>
+
+    <div id="dataBadge" class="data-badge">● Conectando</div>
+
+    <div class="progress-section">
+      <div class="progress-labels"><span>0 m</span><span id="maxLabel">4 m</span></div>
+      <div class="progress-bar" id="progressBar">
+        <div class="progress-fill" id="progressFill" style="width:0%;background:var(--unknown)"></div>
+        <div class="progress-marker marker-aten"  id="markerAten"  style="left:45%"></div>
+        <div class="progress-marker marker-alert" id="markerAlert" style="left:67%"></div>
+      </div>
+    </div>
+
+    <div class="cotas-info">
+      <div class="cota-item"><div class="cota-dot" style="background:var(--attention)"></div>Atenção: <strong id="cotaAten">1.80</strong> m</div>
+      <div class="cota-item"><div class="cota-dot" style="background:var(--critical)"></div>Alerta: <strong id="cotaAlert">2.70</strong> m</div>
+    </div>
+  </div>
+
+  <!-- Métricas -->
+  <div class="section-title">Dados da Estação</div>
+  <div class="metrics-grid">
+    <div class="metric-card">
+      <div class="metric-label">Última leitura</div>
+      <div class="metric-value" id="lastHour" style="font-size:18px">--:--</div>
+      <div class="metric-sub" id="lastDate">--/--/----</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Variação 1h</div>
+      <div class="metric-value" id="variation">--</div>
+      <div class="metric-sub" id="variationDir">aguardando</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Máx. 24h</div>
+      <div class="metric-value" id="max24h">-- m</div>
+      <div class="metric-sub">nível máximo</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Mín. 24h</div>
+      <div class="metric-value" id="min24h">-- m</div>
+      <div class="metric-sub">nível mínimo</div>
+    </div>
+  </div>
+
+  <!-- Gráfico -->
+  <div class="section-title">Nível do Rio (cm)</div>
+  <div class="chart-container">
+    <div class="chart-header">
+      <div class="chart-title">Histórico</div>
+      <div class="chart-tabs">
+        <button class="chart-tab active" onclick="switchTab(this,'6h')">6h</button>
+        <button class="chart-tab" onclick="switchTab(this,'24h')">24h</button>
+        <button class="chart-tab" onclick="switchTab(this,'7d')">7d</button>
+      </div>
+    </div>
+    <canvas id="riverChart" height="140"></canvas>
+  </div>
+
+  <!-- Alertas -->
+  <div class="section-title">Histórico de Alertas</div>
+  <div class="alerts-list" id="alertsList">
+    <div class="alert-item">
+      <div class="alert-dot unknown"></div>
+      <div class="alert-text">Aguardando dados...</div>
+      <div class="alert-time">--:--</div>
+    </div>
+  </div>
+
+  <!-- Fonte -->
+  <div class="source-info">
+    <div class="source-dot off" id="sourceDot"></div>
+    <div class="source-text" id="sourceText">
+      <strong>Conectando</strong>GitHub Actions · Atualização horária
+    </div>
+  </div>
+
+</div>
+
+<!-- Install Banner -->
+<div class="install-banner" id="installBanner" style="display:none">
+  <div>📲</div>
+  <div class="install-text">
+    <strong>Instalar no celular</strong>
+    Funciona offline com últimos dados
+  </div>
+  <button class="install-btn" id="installBtn">Instalar</button>
+  <button class="install-close" onclick="document.getElementById('installBanner').style.display='none'">×</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+// ── Config ───────────────────────────────────────────────────
+const COTA_ATENCAO  = 1.80;
+const COTA_ALERTA   = 2.70;
+const COTA_MAX      = 4.0;
+const DADOS_URL     = 'dados.json';   // mesmo repositório — sem CORS!
+
+let chartInstance = null;
+let currentTab    = '6h';
+let dadosGlobais  = null;
+
+// ── Classificação ─────────────────────────────────────────────
+const STATUS_MAP = {
+  normal:    { label:'✅ NORMAL',    desc:'Rio dentro dos limites normais. Sem risco.', color:'#22c55e' },
+  attention: { label:'📈 ELEVANDO',  desc:'Rio em elevação. Dentro da normalidade mas em observação.', color:'#f59e0b' },
+  alert:     { label:'⚠️ ATENÇÃO',   desc:`Nível elevado — próximo à cota de atenção (${COTA_ATENCAO}m).`, color:'#f97316' },
+  critical:  { label:'🚨 CRÍTICO',   desc:`Rio acima da cota de alerta (${COTA_ALERTA}m). Risco de transbordamento!`, color:'#ef4444' },
+  unknown:   { label:'❓ SEM DADOS', desc:'Aguardando leitura da estação.', color:'#6b7280' },
+};
+
+// ── Carrega dados.json ────────────────────────────────────────
+async function loadData() {
+  const btn = document.getElementById('refreshBtn');
+  btn.classList.add('spinning');
+
+  try {
+    // Adiciona timestamp para evitar cache do browser
+    const resp = await fetch(`${DADOS_URL}?t=${Date.now()}`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const dados = await resp.json();
+    dadosGlobais = dados;
+    renderUI(dados);
+  } catch(e) {
+    console.error('Erro ao carregar dados.json:', e);
+    renderErro(e.message);
+  }
+
+  btn.classList.remove('spinning');
+}
+
+// ── Renderiza UI ──────────────────────────────────────────────
+function renderUI(dados) {
+  const nivel  = dados.nivel_atual;
+  const status = dados.status || 'unknown';
+  const info   = STATUS_MAP[status] || STATUS_MAP.unknown;
+  const hist   = dados.historico || [];
+
+  // Card principal
+  const card = document.getElementById('statusCard');
+  card.className = `status-card ${status}`;
+  document.getElementById('statusName').textContent  = info.label;
+  document.getElementById('statusDesc').textContent  = info.desc;
+  document.getElementById('levelValue').textContent  = nivel != null ? nivel.toFixed(2) : '--.-';
+
+  // Tendência
+  const vari = dados.variacao_cm;
+  let trendIcon = '→', variText = '-- cm', variDir = 'estável';
+  if (vari != null) {
+    if (vari >  2) { trendIcon = '↑'; variDir = 'subindo'; }
+    if (vari < -2) { trendIcon = '↓'; variDir = 'descendo'; }
+    variText = `${vari > 0 ? '+' : ''}${vari.toFixed(0)} cm`;
+  }
+  document.getElementById('levelTrend').textContent  = trendIcon;
+  document.getElementById('variation').textContent   = variText;
+  document.getElementById('variationDir').textContent= variDir;
+
+  // Badge fonte
+  const badge = document.getElementById('dataBadge');
+  const isDemo = dados.fonte === 'aguardando' || dados.fonte === 'indisponivel';
+  badge.className = isDemo ? 'data-badge demo' : 'data-badge';
+  badge.textContent = isDemo ? '⚠ Aguardando 1ª coleta' : `● ${dados.fonte}`;
+
+  // Cotas
+  const ca = dados.cota_atencao || COTA_ATENCAO;
+  const cal = dados.cota_alerta  || COTA_ALERTA;
+  document.getElementById('cotaAten').textContent  = ca.toFixed(2);
+  document.getElementById('cotaAlert').textContent = cal.toFixed(2);
+
+  // Barra
+  const pct = nivel != null ? Math.min(100, (nivel / COTA_MAX) * 100) : 0;
+  document.getElementById('progressFill').style.width      = pct + '%';
+  document.getElementById('progressFill').style.background = info.color;
+  document.getElementById('markerAten').style.left  = ((ca  / COTA_MAX) * 100) + '%';
+  document.getElementById('markerAlert').style.left = ((cal / COTA_MAX) * 100) + '%';
+  document.getElementById('maxLabel').textContent   = COTA_MAX + ' m';
+
+  // Métricas
+  if (dados.max_24h != null) document.getElementById('max24h').textContent = dados.max_24h.toFixed(2) + ' m';
+  if (dados.min_24h != null) document.getElementById('min24h').textContent = dados.min_24h.toFixed(2) + ' m';
+
+  // Última leitura
+  if (dados.atualizado_em) {
+    const ts = new Date(dados.atualizado_em);
+    document.getElementById('lastHour').textContent = `${ts.getHours().toString().padStart(2,'0')}:${ts.getMinutes().toString().padStart(2,'0')}`;
+    document.getElementById('lastDate').textContent = `${ts.getDate().toString().padStart(2,'0')}/${(ts.getMonth()+1).toString().padStart(2,'0')}/${ts.getFullYear()}`;
+  }
+
+  // Fonte
+  document.getElementById('sourceDot').className = isDemo ? 'source-dot off' : 'source-dot';
+  document.getElementById('sourceText').innerHTML = isDemo
+    ? `<strong>Aguardando 1ª execução</strong>GitHub Actions rodará em breve — atualização horária`
+    : `<strong>${dados.fonte} — Dados reais ✓</strong>Estação ${dados.estacao || '27290000'} · Rio Coruripe · AL`;
+
+  // Gráfico e alertas
+  if (hist.length > 0) {
+    renderChart(hist, currentTab, info.color);
+    renderAlertas(hist, status);
+  }
+}
+
+function renderErro(msg) {
+  document.getElementById('statusName').textContent = '⚠ Erro';
+  document.getElementById('statusDesc').textContent = 'Não foi possível carregar dados.json. ' + msg;
+  document.getElementById('sourceDot').className = 'source-dot off';
+  document.getElementById('sourceText').innerHTML = `<strong>Erro de conexão</strong>${msg}`;
+}
+
+// ── Gráfico ───────────────────────────────────────────────────
+function renderChart(hist, tab, color) {
+  const hours  = tab === '6h' ? 6 : tab === '24h' ? 24 : 168;
+  const cutoff = new Date(Date.now() - hours * 3600000).toISOString().slice(0,16);
+  const filt   = hist.filter(d => d.ts >= cutoff);
+
+  const step   = Math.max(1, Math.floor(filt.length / (tab === '7d' ? 56 : 48)));
+  const sample = filt.filter((_, i) => i % step === 0 || i === filt.length - 1);
+
+  const labels = sample.map(d => {
+    const ts = new Date(d.ts);
+    if (tab === '7d') return `${ts.getDate()}/${ts.getMonth()+1}`;
+    return `${ts.getHours().toString().padStart(2,'0')}:${ts.getMinutes().toString().padStart(2,'0')}`;
+  });
+  const values = sample.map(d => (d.nivel * 100).toFixed(0));
+
+  if (chartInstance) chartInstance.destroy();
+  const ctx = document.getElementById('riverChart').getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, 0, 140);
+  grad.addColorStop(0, color + '40');
+  grad.addColorStop(1, color + '05');
+
+  chartInstance = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets: [{ data: values, borderColor: color, backgroundColor: grad, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, fill: true, tension: 0.4 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: { display: false },
+        tooltip: { backgroundColor: '#0d1929', borderColor: '#1a2d47', borderWidth: 1, titleColor: '#5a7a9e', bodyColor: '#e8f0fe', callbacks: { label: c => `  ${c.parsed.y} cm` } }
+      },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,.03)' }, ticks: { color: '#5a7a9e', font: { family: 'Space Mono', size: 9 }, maxTicksLimit: 6, maxRotation: 0 } },
+        y: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#5a7a9e', font: { family: 'Space Mono', size: 9 }, callback: v => v + 'cm' } }
+      }
+    }
+  });
+}
+
+function switchTab(btn, tab) {
+  document.querySelectorAll('.chart-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentTab = tab;
+  if (dadosGlobais?.historico?.length) {
+    const nivel  = dadosGlobais.nivel_atual;
+    const status = dadosGlobais.status || 'unknown';
+    const info   = STATUS_MAP[status] || STATUS_MAP.unknown;
+    renderChart(dadosGlobais.historico, tab, info.color);
+  }
+}
+
+// ── Alertas históricos ────────────────────────────────────────
+function renderAlertas(hist, statusAtual) {
+  const alertas = [];
+  for (let i = hist.length - 1; i >= Math.max(0, hist.length - 48); i--) {
+    const prev = hist[i-1]; const curr = hist[i];
+    if (!prev) continue;
+    const sprev = classify(prev.nivel); const scurr = classify(curr.nivel);
+    if (sprev !== scurr) {
+      alertas.push({ status: scurr, nivel: curr.nivel, ts: curr.ts, de: STATUS_MAP[sprev]?.label });
+    }
+  }
+
+  if (alertas.length === 0) {
+    const last = hist[hist.length-1];
+    alertas.push({ status: statusAtual, nivel: last?.nivel, ts: last?.ts, de: null });
+  }
+
+  document.getElementById('alertsList').innerHTML = alertas.slice(0, 5).map(a => {
+    const ts = new Date(a.ts);
+    const timeStr = `${ts.getDate().toString().padStart(2,'0')}/${(ts.getMonth()+1).toString().padStart(2,'0')} ${ts.getHours().toString().padStart(2,'0')}:${ts.getMinutes().toString().padStart(2,'0')}`;
+    const msg = a.de
+      ? `Mudou: ${a.de} → <strong>${STATUS_MAP[a.status]?.label || a.status}</strong> (${a.nivel?.toFixed(2)}m)`
+      : `${STATUS_MAP[a.status]?.label || a.status} — ${a.nivel?.toFixed(2) ?? '--'}m`;
+    return `<div class="alert-item"><div class="alert-dot ${a.status}"></div><div class="alert-text">${msg}</div><div class="alert-time">${timeStr}</div></div>`;
+  }).join('');
+}
+
+function classify(n) {
+  if (n == null) return 'unknown';
+  if (n >= COTA_ALERTA)          return 'critical';
+  if (n >= COTA_ATENCAO)         return 'alert';
+  if (n >= COTA_ATENCAO * 0.7)   return 'attention';
+  return 'normal';
+}
+
+// ── PWA ───────────────────────────────────────────────────────
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault(); deferredPrompt = e;
+  document.getElementById('installBanner').style.display = 'flex';
+});
+document.getElementById('installBtn')?.addEventListener('click', async () => {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') document.getElementById('installBanner').style.display = 'none';
+    deferredPrompt = null;
+  }
+});
+
+// ── Init ──────────────────────────────────────────────────────
+loadData();
+setInterval(loadData, 15 * 60 * 1000); // recarrega a cada 15 min
+</script>
+</body>
+</html>

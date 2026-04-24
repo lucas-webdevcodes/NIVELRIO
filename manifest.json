@@ -1,0 +1,17 @@
+{
+  "name": "Rio Coruripe — Monitor",
+  "short_name": "Rio Coruripe",
+  "description": "Monitoramento do nível do Rio Coruripe em tempo real",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#070e1c",
+  "theme_color": "#070e1c",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://api.iconify.design/twemoji/water-wave.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ]
+}

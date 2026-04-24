@@ -1,0 +1,13 @@
+{
+  "atualizado_em": "2024-01-01T00:00:00",
+  "fonte": "aguardando",
+  "estacao": "27290000",
+  "nivel_atual": null,
+  "status": "unknown",
+  "variacao_cm": null,
+  "max_24h": null,
+  "min_24h": null,
+  "cota_atencao": 1.80,
+  "cota_alerta": 2.70,
+  "historico": []
+}

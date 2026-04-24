@@ -1,0 +1,28 @@
+name: Atualizar Dados Rio Coruripe
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  coletar:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Baixar repositório
+        uses: actions/checkout@v4
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Coletar dados
+        run: python coletar.py
+      - name: Salvar dados.json
+        run: |
+          git config user.name "Rio Coruripe Bot"
+          git config user.email "bot@rio-coruripe"
+          git add dados.json
+          git diff --staged --quiet || git commit -m "Dados atualizados"
+          git push
